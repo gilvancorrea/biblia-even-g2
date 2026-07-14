@@ -17,7 +17,9 @@ const BODY_BORDER = 0
 const INNER_W = BODY_W - 2 * (BODY_PAD + BODY_BORDER)
 const INNER_H = BODY_H - 2 * (BODY_PAD + BODY_BORDER)
 
-const pages = paginate(SAMPLE_TEXT, { width: INNER_W, height: INNER_H })
+loadBibleText().then((text) => {
+  const pages = paginate(text);
+}), { width: INNER_W, height: INNER_H })
 let currentPage = 0
 
 const bridge = await waitForEvenAppBridge()
