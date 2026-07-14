@@ -6,7 +6,7 @@ import {
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk'
 import { paginate } from './paginate'
-import { loadBibleText } from "./sample"
+import { loadBibleText } from './sample'
 
 // Body container geometry. Inner box (width/height minus padding and border)
 // is what pretext measures against, so keep these in sync if you resize.
@@ -17,9 +17,9 @@ const BODY_BORDER = 0
 const INNER_W = BODY_W - 2 * (BODY_PAD + BODY_BORDER)
 const INNER_H = BODY_H - 2 * (BODY_PAD + BODY_BORDER)
 
-loadBibleText().then((text) => {
-  const pages = paginate(text);
-}), { width: INNER_W, height: INNER_H })
+const text = await loadBibleText()
+const pages = paginate(text, { width: INNER_W, height: INNER_H })
+
 let currentPage = 0
 
 const bridge = await waitForEvenAppBridge()
@@ -58,11 +58,12 @@ const created = await bridge.createStartUpPageContainer(
 if (created !== 0) console.error('createStartUpPageContainer failed:', created)
 
 function pagerLabel() {
-  return `${currentPage + 1} / ${pages.length}  ·  tap: next  ·  swipe up: prev  ·  double-tap: exit`
+  return `${currentPage + 1} / ${pages.length} · toque: próxima · deslize: anterior · toque duplo: sair`
 }
 
 // Serialize bridge writes so a fast-tapping user can't queue overlapping upgrades.
 let rendering: Promise<unknown> = Promise.resolve()
+
 async function showPage(index: number) {
   if (index < 0 || index >= pages.length || index === currentPage) return
   currentPage = index
@@ -93,15 +94,6 @@ function cleanup() {
   unsubscribe()
 }
 
-// Event routing, critical details:
-//   • Protobuf omits zero-value fields on the wire, so CLICK_EVENT (0)
-//     arrives as `undefined`. Always coalesce with `?? 0` before comparing.
-//   • Scroll gestures (SCROLL_TOP/SCROLL_BOTTOM) route through
-//     `event.textEvent`. Taps/double-taps/lifecycle route through
-//     `event.sysEvent`. Check each branch separately.
-//   • Double-tap → `shutDownPageContainer(1)` is a root-level check: it
-//     must fire no matter which envelope the event arrives in, so users
-//     can always exit the app.
 const unsubscribe = bridge.onEvenHubEvent(event => {
   const sysType = event.sysEvent?.eventType ?? null
   const textType = event.textEvent?.eventType ?? null
@@ -115,6 +107,7 @@ const unsubscribe = bridge.onEvenHubEvent(event => {
     showPage(currentPage - 1).catch(err => console.error(err))
     return
   }
+
   if (textType === OsEventTypeList.SCROLL_BOTTOM_EVENT) {
     showPage(currentPage + 1).catch(err => console.error(err))
     return
@@ -124,6 +117,7 @@ const unsubscribe = bridge.onEvenHubEvent(event => {
     showPage(currentPage + 1).catch(err => console.error(err))
     return
   }
+
   if (sysType === OsEventTypeList.SYSTEM_EXIT_EVENT || sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT) {
     cleanup()
   }
@@ -135,12 +129,12 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <main style="margin:auto;padding:24px;max-width:680px;box-sizing:border-box;">
     <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h1 style="font-size:18px;font-weight:600;margin:0;">Text-Heavy Reader</h1>
+      <h1 style="font-size:18px;font-weight:600;margin:0;">Bíblia Even</h1>
       <span id="pageCount" style="font-size:12px;color:#919191;"></span>
     </header>
     <pre id="mirror" style="background:#2E2E2E;border:1px solid #3E3E3E;border-radius:12px;padding:20px;font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#E5E5E5;margin:0;"></pre>
     <footer style="font-size:12px;color:#7B7B7B;text-align:center;margin-top:16px;">
-      Tap glasses: next page · swipe up: previous · double-tap: exit
+      Toque: próxima página · deslize: anterior · toque duplo: sair
     </footer>
   </main>
 `
