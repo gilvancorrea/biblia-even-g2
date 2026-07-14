@@ -8,8 +8,6 @@ import {
 import { paginate } from './paginate'
 import { loadBibleText } from './sample'
 
-// Body container geometry. Inner box (width/height minus padding and border)
-// is what pretext measures against, so keep these in sync if you resize.
 const BODY_W = 576
 const BODY_H = 240
 const BODY_PAD = 4
@@ -53,20 +51,27 @@ const pager = new TextContainerProperty({
 })
 
 const created = await bridge.createStartUpPageContainer(
-  new CreateStartUpPageContainer({ containerTotalNum: 2, textObject: [body, pager] }),
+  new CreateStartUpPageContainer({
+    containerTotalNum: 2,
+    textObject: [body, pager],
+  }),
 )
-if (created !== 0) console.error('createStartUpPageContainer failed:', created)
+
+if (created !== 0) {
+  console.error('createStartUpPageContainer failed:', created)
+}
 
 function pagerLabel() {
   return `${currentPage + 1} / ${pages.length} · toque: próxima · deslize: anterior · toque duplo: sair`
 }
 
-// Serialize bridge writes so a fast-tapping user can't queue overlapping upgrades.
 let rendering: Promise<unknown> = Promise.resolve()
 
 async function showPage(index: number) {
   if (index < 0 || index >= pages.length || index === currentPage) return
+
   currentPage = index
+
   rendering = rendering.then(async () => {
     await bridge.textContainerUpgrade(
       new TextContainerUpgrade({
@@ -75,6 +80,7 @@ async function showPage(index: number) {
         content: pages[index],
       }),
     )
+
     await bridge.textContainerUpgrade(
       new TextContainerUpgrade({
         containerID: 2,
@@ -83,11 +89,13 @@ async function showPage(index: number) {
       }),
     )
   })
+
   await rendering
   mirrorCompanion()
 }
 
 let cleanedUp = false
+
 function cleanup() {
   if (cleanedUp) return
   cleanedUp = true
@@ -98,7 +106,10 @@ const unsubscribe = bridge.onEvenHubEvent(event => {
   const sysType = event.sysEvent?.eventType ?? null
   const textType = event.textEvent?.eventType ?? null
 
-  if (sysType === OsEventTypeList.DOUBLE_CLICK_EVENT || textType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
+  if (
+    sysType === OsEventTypeList.DOUBLE_CLICK_EVENT ||
+    textType === OsEventTypeList.DOUBLE_CLICK_EVENT
+  ) {
     bridge.shutDownPageContainer(1)
     return
   }
@@ -118,7 +129,10 @@ const unsubscribe = bridge.onEvenHubEvent(event => {
     return
   }
 
-  if (sysType === OsEventTypeList.SYSTEM_EXIT_EVENT || sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT) {
+  if (
+    sysType === OsEventTypeList.SYSTEM_EXIT_EVENT ||
+    sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT
+  ) {
     cleanup()
   }
 })
@@ -126,13 +140,16 @@ const unsubscribe = bridge.onEvenHubEvent(event => {
 window.addEventListener('beforeunload', cleanup)
 
 const app = document.querySelector<HTMLDivElement>('#app')!
+
 app.innerHTML = `
   <main style="margin:auto;padding:24px;max-width:680px;box-sizing:border-box;">
     <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <h1 style="font-size:18px;font-weight:600;margin:0;">Bíblia Even</h1>
       <span id="pageCount" style="font-size:12px;color:#919191;"></span>
     </header>
+
     <pre id="mirror" style="background:#2E2E2E;border:1px solid #3E3E3E;border-radius:12px;padding:20px;font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#E5E5E5;margin:0;"></pre>
+
     <footer style="font-size:12px;color:#7B7B7B;text-align:center;margin-top:16px;">
       Toque: próxima página · deslize: anterior · toque duplo: sair
     </footer>
@@ -142,6 +159,7 @@ app.innerHTML = `
 function mirrorCompanion() {
   const mirror = document.getElementById('mirror')
   const count = document.getElementById('pageCount')
+
   if (mirror) mirror.textContent = pages[currentPage] ?? ''
   if (count) count.textContent = `${currentPage + 1} / ${pages.length}`
 }
