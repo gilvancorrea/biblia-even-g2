@@ -1,10 +1,3 @@
-import {
-  waitForEvenAppBridge,
-  TextContainerProperty,
-  CreateStartUpPageContainer,
-  TextContainerUpgrade,
-  OsEventTypeList,
-} from '@evenrealities/even_hub_sdk'
 import { paginate } from './paginate'
 import { loadBibleText } from './sample'
 
@@ -30,16 +23,12 @@ app.innerHTML = `
     <pre id="mirror" style="background:#2E2E2E;border:1px solid #3E3E3E;border-radius:12px;padding:20px;font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#E5E5E5;margin:0;"></pre>
 
     <footer style="font-size:12px;color:#7B7B7B;text-align:center;margin-top:16px;">
-      Toque: próxima página · deslize: anterior · toque duplo: sair
+      Clique na tela para avançar
     </footer>
   </main>
 `
 
-function pagerLabel() {
-  return `${currentPage + 1} / ${pages.length} · toque: próxima · deslize: anterior · toque duplo: sair`
-}
-
-function mirrorCompanion() {
+function render() {
   const mirror = document.getElementById('mirror')
   const count = document.getElementById('pageCount')
 
@@ -47,135 +36,17 @@ function mirrorCompanion() {
   if (count) count.textContent = `${currentPage + 1} / ${pages.length}`
 }
 
-mirrorCompanion()
+render()
 
-async function startApp() {
-  const text = await loadBibleText()
-  pages = paginate(text, { width: INNER_W, height: INNER_H })
-  currentPage = 0
-  mirrorCompanion()
-
-  const bridge = await waitForEvenAppBridge()
-
-  const body = new TextContainerProperty({
-    xPosition: 0,
-    yPosition: 0,
-    width: BODY_W,
-    height: BODY_H,
-    borderWidth: BODY_BORDER,
-    borderColor: 5,
-    paddingLength: BODY_PAD,
-    containerID: 1,
-    containerName: 'body',
-    content: pages[0] ?? '(empty)',
-    isEventCapture: 1,
-  })
-
-  const pager = new TextContainerProperty({
-    xPosition: 0,
-    yPosition: 250,
-    width: 576,
-    height: 30,
-    borderWidth: 0,
-    borderColor: 5,
-    paddingLength: 4,
-    containerID: 2,
-    containerName: 'pager',
-    content: pagerLabel(),
-    isEventCapture: 0,
-  })
-
-  const created = await bridge.createStartUpPageContainer(
-    new CreateStartUpPageContainer({
-      containerTotalNum: 2,
-      textObject: [body, pager],
-    }),
-  )
-
-  if (created !== 0) {
-    console.error('createStartUpPageContainer failed:', created)
-  }
-
-  let rendering: Promise<unknown> = Promise.resolve()
-
-  async function showPage(index: number) {
-    if (index < 0 || index >= pages.length || index === currentPage) return
-
-    currentPage = index
-
-    rendering = rendering.then(async () => {
-      await bridge.textContainerUpgrade(
-        new TextContainerUpgrade({
-          containerID: 1,
-          containerName: 'body',
-          content: pages[index],
-        }),
-      )
-
-      await bridge.textContainerUpgrade(
-        new TextContainerUpgrade({
-          containerID: 2,
-          containerName: 'pager',
-          content: pagerLabel(),
-        }),
-      )
-    })
-
-    await rendering
-    mirrorCompanion()
-  }
-
-  let cleanedUp = false
-  let unsubscribe = () => {}
-
-  function cleanup() {
-    if (cleanedUp) return
-    cleanedUp = true
-    unsubscribe()
-  }
-
-  unsubscribe = bridge.onEvenHubEvent(event => {
-    const sysType = event.sysEvent?.eventType ?? null
-    const textType = event.textEvent?.eventType ?? null
-
-    if (
-      sysType === OsEventTypeList.DOUBLE_CLICK_EVENT ||
-      textType === OsEventTypeList.DOUBLE_CLICK_EVENT
-    ) {
-      bridge.shutDownPageContainer(1)
-      return
-    }
-
-    if (textType === OsEventTypeList.SCROLL_TOP_EVENT) {
-      showPage(currentPage - 1).catch(err => console.error(err))
-      return
-    }
-
-    if (textType === OsEventTypeList.SCROLL_BOTTOM_EVENT) {
-      showPage(currentPage + 1).catch(err => console.error(err))
-      return
-    }
-
-    if (sysType === OsEventTypeList.CLICK_EVENT) {
-      showPage(currentPage + 1).catch(err => console.error(err))
-      return
-    }
-
-    if (
-      sysType === OsEventTypeList.SYSTEM_EXIT_EVENT ||
-      sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT
-    ) {
-      cleanup()
-    }
-  })
-
-  window.addEventListener('beforeunload', cleanup)
-}
-
-startApp().catch(error => {
-  console.error(error)
-  pages = [
-    `Bíblia Even
+async function start() {
+  try {
+    const text = await loadBibleText()
+    pages = paginate(text, { width: INNER_W, height: INNER_H })
+    currentPage = 0
+    render()
+  } catch (error) {
+    pages = [
+      `Bíblia Even
 
 Erro ao carregar a Bíblia.
 
@@ -184,7 +55,17 @@ public/bible/blivre.json
 
 Detalhe:
 ${String(error)}`,
-  ]
-  currentPage = 0
-  mirrorCompanion()
+    ]
+    currentPage = 0
+    render()
+  }
+}
+
+document.body.addEventListener('click', () => {
+  if (currentPage < pages.length - 1) {
+    currentPage++
+    render()
+  }
 })
+
+start()
