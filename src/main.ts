@@ -6,7 +6,7 @@ import {
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk'
 import { paginate } from './paginate'
-import { SAMPLE_TEXT } from './sample'
+import { loadBibleText } from "./sample"
 
 // Body container geometry. Inner box (width/height minus padding and border)
 // is what pretext measures against, so keep these in sync if you resize.
